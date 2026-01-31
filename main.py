@@ -213,7 +213,7 @@ class UstxPlayerSettings:
     def outport_uplr_file(self, output_file):
         """ 导出uplr文件"""
         try:
-            with open(output_file, "w", encoding="GB2312") as uplr:
+            with open(output_file, "w", encoding="utf-8") as uplr:
                 # ========== 第一模块：编码配置 ==========
                 uplr.write("#Encoding\n")
                 # 写入编码配置（获取 encoding_var 的值）
@@ -270,7 +270,7 @@ class UstxPlayerSettings:
 
     def import_uplr_file(self, input_file):
         """读取uplr文件的方法"""
-        with open(input_file, "r", encoding="GB2312") as uplr:
+        with open(input_file, "r", encoding="utf-8") as uplr:
             for lines in uplr:
                 # 步骤1：清理行首尾的空白、换行符
                 lines = lines.strip()
