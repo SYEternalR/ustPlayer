@@ -1,4 +1,5 @@
-def get_ust_info(ust_folder):
+# ustreader.py
+def get_ust_info(ust_folder,encoding):
     # ===== 1. 初始化要提取的信息（本地化变量）=====
     ust_version = ""          # 存储UST版本
     ust_tempo = 0.0           # 存储速度
@@ -7,7 +8,7 @@ def get_ust_info(ust_folder):
     current_note = {}         # 临时存储当前解析的音符
     
     # ===== 2. 打开文件并读取内容（保留你的原始写法，优化了文件关闭）=====
-    input_file = open(f"{ust_folder}", "r", encoding="Shift-JIS")
+    input_file = open(f"{ust_folder}", "r", encoding=encoding)
     try:
         # 按行读取（避免一次性读入后再遍历字符）
         ust_lines = input_file.readlines()
@@ -45,7 +46,7 @@ def get_ust_info(ust_folder):
                     "length": 0,
                     "lyric": "",
                     "note_num": 0,
-                    "pitch_bend": ""
+                    "pitch_bend": []  # 改为列表，存储整数
                 }
                 in_setting = False
                 in_note = True
@@ -76,7 +77,14 @@ def get_ust_info(ust_folder):
                 elif key == "NoteNum":
                     current_note["note_num"] = int(value)
                 elif key == "PitchBend":
-                    current_note["pitch_bend"] = value
+                    # 新增：将PitchBend字符串转为整数列表（过滤无效值）
+                    current_note["pitch_bend"] = []
+                    if value.strip():
+                        for num_str in value.split(","):
+                            try:
+                                current_note["pitch_bend"].append(int(num_str.strip()))
+                            except:
+                                pass
         
         # 最后一个音符加入列表
         if current_note:
@@ -97,9 +105,8 @@ def get_ust_info(ust_folder):
 if __name__ == "__main__":
     # 替换成你的UST文件路径
     ust_path = "sample.ust"
-    
-    # 调用函数提取信息
-    ust_info = get_ust_info(ust_path)
+    # 调用函数提取信息（注意：这里要传encoding参数）
+    ust_info = get_ust_info(ust_path, "UTF-8")
     
     # 本地化打印提取结果
     print("=== UST 提取结果 ===")
@@ -108,4 +115,4 @@ if __name__ == "__main__":
     print(f"轨道数：{ust_info['tracks']}")
     print("\n音符列表：")
     for idx, note in enumerate(ust_info['notes']):
-        print(f"  音符{idx+1}：歌词={note['lyric']}，音高={note['note_num']}，时长={note['length']}")
+        print(f"  音符{idx+1}：歌词={note['lyric']}，音高={note['note_num']}，时长={note['length']}，PitchBend长度={len(note['pitch_bend'])}")

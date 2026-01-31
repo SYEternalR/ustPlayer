@@ -7,7 +7,7 @@ from datetime import timedelta
 class NoteLyricDisplay:
     def __init__(self, root, ust_info):
         self.root = root
-        self.root.title("UST播放")
+        self.root.title("ustPlayerform")
         
         # 基础配置
         self.fullscreen = ust_info["player_style"].get("fullscreen", True)
@@ -36,6 +36,9 @@ class NoteLyricDisplay:
         self.start_real_time = time.time()
         self.play_elapsed_time = 0
         self.play_timer_id = None
+
+        # 是否显示音高线变化
+        self.curve_show = ust_info["show_config"].get("curve_show", False)
         
         # ========== 你的LRC自定义配置（完全保留） ==========
         self.show_lyric = ust_info["show_config"].get("lyric", True)
@@ -78,7 +81,7 @@ class NoteLyricDisplay:
         self.copyright_alpha = 100
 
         # 音名透明度
-        self.note_alpha = 128
+        self.note_alpha = 90
 
         # 颜色配置
         self.ust_lyric_color = self.hex_to_rgb(self.validate_hex_color(ust_info["player_style"].get("lyric_color", "#FFFFFF")))
@@ -104,11 +107,16 @@ class NoteLyricDisplay:
         self.end_display = ust_info["player_style"].get("end_display", "END")
         self.end_custom_text = ust_info["player_style"].get("end_custom_text", "")
 
+        # ===== 音高线配置（修改：长度随length变化，固定粗细）=====
+        self.note_line_offset = self.note_font_size // 4  # 音高名下方偏移
+        self.note_line_width = 5  # 固定粗细（解决不一致）
+        self.length_to_pixel = 1  # 缩放系数：length=480 → 240像素（可自定义调整）
+
         # 启动计时器
         self.start_play_timer()
         self.play_next()
 
-    # ========== 工具方法 ==========
+    # ========== 工具方法（完全保留） ==========
     def validate_hex_color(self, hex_color):
         pattern = r'^#([0-9A-Fa-f]{6})$'
         if re.match(pattern, str(hex_color)):
@@ -158,7 +166,7 @@ class NoteLyricDisplay:
         except:
             self.lrc_lines = []
 
-    # ========== 播放计时 ==========
+    # ========== 播放计时（完全保留） ==========
     def start_play_timer(self):
         def update():
             try:
@@ -197,7 +205,7 @@ class NoteLyricDisplay:
             pass
         return ""
 
-    # ========== 显示更新（核心修复：歌词位置） ==========
+    # ========== 显示更新（核心修改：音高线绘制 + 图层顺序） ==========
     def get_transparent_color(self, r, g, b, alpha):
         try:
             alpha = max(0, min(255, alpha))
@@ -252,12 +260,12 @@ class NoteLyricDisplay:
         except:
             pass
 
-    def update_full_display(self, ust_lyric, note_name):
+    def update_full_display(self, ust_lyric, note_name, current_note):  # 带current_note参数，解决错位
         try:
             self.canvas.delete("all")
-            cx, cy = self.w//2, self.h//2
+            cx, cy = self.w//2, self.h//2  # 屏幕整体中点（横纵基准）
 
-            # 1. 音名
+            # ========== 第一步：最先绘制音高名（最下层，底层） ==========
             if note_name:
                 self.canvas.create_text(
                     cx, cy, text=note_name,
@@ -265,7 +273,69 @@ class NoteLyricDisplay:
                     font=self.note_font
                 )
 
-            # 2. UST歌词
+            # ========== 第二步：再绘制音高线（中间层，在音高名上方、歌字下方） ==========
+            if self.curve_show:
+                pb_data = current_note.get("pitch_bend", [])
+                note_length = current_note.get("length", 0)
+                
+                # 仅当有有效PitchBend数据且length>0时绘制
+                if pb_data and len(pb_data) >= 2 and note_length > 0:
+                    # 1. 计算音高线总长度（随note_length变化，可通过length_to_pixel调整）
+                    curve_total_width = int(note_length * self.length_to_pixel)
+                    
+                    # 2. 横向居中：以屏幕水平中点为中心，左右对称延伸
+                    start_x = cx - (curve_total_width // 2)
+                    end_x = cx + (curve_total_width // 2)
+                    
+                    # 3. 纵向居中：以屏幕垂直中点为基准，围绕中点上下波动（无额外偏移，纯居中）
+                    base_y = cy  # 垂直中点，如需微调可改为 cy ± 数值（如cy + 30）
+                    
+                    # 4. 生成曲线坐标点（横纵均贴合屏幕中点）
+                    points = []
+                    pb_count = len(pb_data)
+                    for i in range(pb_count):
+                        # 横向：从左到右均匀分布，保持水平居中
+                        x = start_x + (i / (pb_count - 1)) * curve_total_width
+                        # 纵向：围绕垂直中点波动，控制波动范围（屏幕9%，避免过大）
+                        y_offset = (pb_data[i] / 100) * (self.h * 0.09)
+                        y = base_y - y_offset
+                        
+                        # ========== 核心修改：超出安全边界后平滑削减跨度 ==========
+                        # 1. 定义安全边界（上下各留100像素，可自定义）
+                        safe_top = 100
+                        safe_bottom = self.h - 100  # 直接使用实例的屏幕高度self.h，无需重新获取
+                        
+                        # 2. 分段判断并处理超出边界的情况
+                        if safe_top <= y <= safe_bottom:
+                            # 正常范围：保持原y坐标
+                            final_y = y
+                        elif y < safe_top:
+                            # 超出上边界：计算超出差值，按比例削减跨度（梯度缩放）
+                            exceed_value = safe_top - y  # 超出上边界的差值（正数）
+                            # 缩放系数：超出越多，缩放越强（0.3~1.0之间，可调整），避免完全归零
+                            scale = max(0.3, 1 - (exceed_value / self.h * 2))  # 2是调节系数，可自定义
+                            final_y = safe_top - (exceed_value * scale)  # 削减超出部分的跨度
+                        else:  # y > safe_bottom
+                            # 超出下边界：同理，梯度缩放
+                            exceed_value = y - safe_bottom  # 超出下边界的差值（正数）
+                            scale = max(0.3, 1 - (exceed_value / self.h * 2))
+                            final_y = safe_bottom + (exceed_value * scale)
+                        
+                        # 3. 确保最终坐标不会极端超出（兜底保护，可选）
+                        final_y = max(50, min(final_y, self.h - 50))
+                        
+                        # 4. 添加处理后的最终坐标到列表
+                        points.append((x, final_y))
+                    
+                    # 5. 绘制音高线（5像素粗、平滑曲线、横纵居中、中间图层）
+                    self.canvas.create_line(
+                        *sum(points, ()),
+                        fill=self.small_font_color,
+                        width=self.note_line_width,  # 已配置为5像素
+                        smooth=True
+                    )
+
+            # ========== 第三步：最后绘制歌字(UST歌词)（最上层，顶层） ==========
             if ust_lyric:
                 self.canvas.create_text(
                     cx, cy, text=ust_lyric,
@@ -273,7 +343,8 @@ class NoteLyricDisplay:
                     font=self.ust_lyric_font
                 )
 
-            # 3. 左上角信息
+            # ========== 后续其他信息绘制（保留原有所有功能，无修改） ==========
+            # 4. 左上角信息（曲名、作者等）
             y_offset = 20
             if self.show_song_name and self.song_name:
                 self.canvas.create_text(20, y_offset, text=self.song_name,
@@ -287,23 +358,23 @@ class NoteLyricDisplay:
                 self.canvas.create_text(20, y_offset, text=self.ust_author,
                     fill=self.small_font_color, font=self.small_font, anchor=tk.NW)
 
-            # 4. 右上角BPM
+            # 5. 右上角BPM
             if self.show_bpm:
                 self.canvas.create_text(self.w-20, 20, text=f"BPM={self.tempo}",
                     fill=self.small_font_color, font=self.small_font, anchor=tk.NE)
 
-            # 5. 底部版权
+            # 6. 底部版权信息
             self.canvas.create_text(self.w//2, self.h-20,
-                text="ustPlayer-v26a24 © 2026 SYEternalR",
+                text="ustPlayer-v26a31 © 2026 SYEternalR",
                 fill=self.get_transparent_color(195,195,195,self.copyright_alpha),
                 font=self.copyright_font)
 
-            # 更新动态元素
+            # 更新动态元素（播放时间、LRC歌词等）
             self.update_dynamic_elements()
         except:
             pass
 
-    # ========== 播放逻辑 ==========
+    # ========== 播放逻辑（完全保留） ==========
     def get_silent_text(self):
         try:
             if self.silent_display == "R":
@@ -331,15 +402,16 @@ class NoteLyricDisplay:
     def play_next(self):
         try:
             if self.current >= len(self.notes):
-                self.update_full_display(self.get_end_text(), "")
+                self.update_full_display(self.get_end_text(), "", {})  # 第三个参数传空字典
                 if self.play_timer_id:
                     self.root.after_cancel(self.play_timer_id)
                 self.root.after(1000, self.root.destroy)
                 return
 
-            note = self.notes[self.current] if self.current < len(self.notes) else {}
-            raw_lyric = note.get("lyric", "")
-            raw_note_num = note.get("note_num", 0)
+            # 取出当前音符（这是关键：直接获取当前self.current对应的音符，不偏移）
+            current_note = self.notes[self.current] if self.current < len(self.notes) else {}
+            raw_lyric = current_note.get("lyric", "")
+            raw_note_num = current_note.get("note_num", 0)
 
             if raw_lyric == "R":
                 ust_lyric = self.get_silent_text()
@@ -352,11 +424,12 @@ class NoteLyricDisplay:
                 self.last_valid_lyric = ust_lyric
                 note_name = self.midi_to_note_name(raw_note_num)
 
-            length = note.get("length", 480)
+            length = current_note.get("length", 480)
             beat = 60 / max(self.tempo, 1)
             dur = max(length * beat / 480, 0.1)
 
-            self.update_full_display(ust_lyric, note_name)
+            # 修改：传递当前音符current_note给update_full_display
+            self.update_full_display(ust_lyric, note_name, current_note)
 
             self.current += 1
             self.root.after(int(dur * 1000), self.play_next)
@@ -372,7 +445,7 @@ class NoteLyricDisplay:
         except:
             return str(midi_num)
 
-    # ========== 关闭 ==========
+    # ========== 关闭（完全保留） ==========
     def close(self, event=None):
         try:
             if self.play_timer_id:
@@ -381,7 +454,7 @@ class NoteLyricDisplay:
         except:
             pass
 
-# 对外接口
+# 对外接口（完全保留）
 def display(ust_info):
     try:
         root = tk.Tk()
