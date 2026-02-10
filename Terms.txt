@@ -1,6 +1,6 @@
 > ustPlayer使用协议
 > 文档使用 GB2312 编写，协议内容修改无效。
-> ustPlayer - v26a31
+> ustPlayer - v26a31~v26b10
 > 协议版本 0.0.2
 > 协议自用户首次启动 ustPlayer 起生效
 
