@@ -1,14 +1,15 @@
 # main.py
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext, colorchooser
 import os
 import sys
 import webbrowser  
 import subprocess  
 import threading
 import configparser  # 新增：用于读写Settings.ini
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, scrolledtext, colorchooser
 
-# 保留原代码的外部模块导入（ustreader、ustplayer，不做任何额外修改）
+from hidpi_tk import fix_HiDPI
+
 import ustreader as ur
 import ustplayer as up
 
@@ -17,7 +18,7 @@ class UstxPlayerSettings:
     def __init__(self, root):  # 1. 去掉 play_callback 参数
         self.root = root
         self.root.title("ustPlayer - v26b10")
-        self.root.geometry("800x500")
+        self.root.geometry("800x550")
         # 2. 去掉 self.play_callback 赋值
         
         # ========== 核心修改：固定Settings.ini到程序根目录 ==========
@@ -1144,6 +1145,7 @@ def play_ust(ust_info, root, safe_display_func):
 
 # ---------------------- 程序入口 ----------------------
 if __name__ == "__main__":
-    root = tk.Tk() 
+    root = tk.Tk()
+    fix_HiDPI(root)
     userform = UstxPlayerSettings(root)
     root.mainloop()
