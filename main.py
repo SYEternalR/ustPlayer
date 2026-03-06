@@ -7,6 +7,7 @@ import webbrowser
 import subprocess  
 import threading
 import configparser  # 新增：用于读写Settings.ini
+import keyboard
 
 # 保留原代码的外部模块导入（ustreader、ustplayer，不做任何额外修改）
 import ustreader as ur
@@ -18,6 +19,10 @@ class UstxPlayerSettings:
         self.root = root
         self.root.title("ustPlayer - v26b10")
         self.root.geometry("800x500")
+        #图标，可选
+        self.icon_img = tk.PhotoImage(file="icon.png")
+        self.root.iconphoto(True, self.icon_img)
+        
         # 2. 去掉 self.play_callback 赋值
         
         # ========== 核心修改：固定Settings.ini到程序根目录 ==========
@@ -57,6 +62,7 @@ class UstxPlayerSettings:
         self.show_song_name_var = tk.BooleanVar(value=True)
         self.show_song_author_var = tk.BooleanVar(value=True)
         self.show_ust_author_var = tk.BooleanVar(value=True)
+        self.record_var = tk.BooleanVar(value=True)
 
         # 编码选择变量
         self.encoding_var = tk.StringVar(value="Shift-JIS")
@@ -254,7 +260,8 @@ class UstxPlayerSettings:
                 uplr.write(f"show_waveform={1 if self.show_waveform_var.get() else 0}\n")
                 uplr.write(f"fullscreen={1 if self.fullscreen_var.get() else 0}\n")
                 uplr.write(f"show_lyric={1 if self.show_lyric_var.get() else 0}\n\n")
-                
+                uplr.write(f"record={1 if self.record_var.get() else 0}\n\n")
+
                 # ========== 第四模块：颜色配置 ==========
                 uplr.write("#ColorSettings\n")
                 # 颜色变量
@@ -328,6 +335,8 @@ class UstxPlayerSettings:
                     self.show_song_author_var.set(value == "1")
                 elif key == "show_ust_author":
                     self.show_ust_author_var.set(value == "1")
+                elif key == "record":
+                    self.record_var.set(value == "1")
                 elif key == "encoding":
                     self.encoding_var.set(value)
                 elif key == "bg_color":
@@ -509,6 +518,10 @@ class UstxPlayerSettings:
         tk.Checkbutton(frame, text="显示调音师", variable=self.show_ust_author_var,
                     font=(cfg["font_family"], cfg["font_size"]), bg="white").grid(
             row=11, column=0, sticky=tk.W, padx=10, pady=cfg["global_pady"])  # 新增一行，避免拥挤
+        # oCam录屏，实验中，
+        tk.Checkbutton(frame, text="自动化录屏(需要oCam)", variable=self.record_var,
+                    font=(cfg["font_family"], cfg["font_size"]), bg="white").grid(
+            row=11, column=1, sticky=tk.W, padx=10, pady=cfg["global_pady"])  
 
         # ========== Play按钮（调整 row 为 12，避免和复选框重叠） ==========
         ttk.Button(
@@ -1071,7 +1084,8 @@ class UstxPlayerSettings:
                     "song_author": self.show_song_author_var.get(),
                     "ust_author": self.show_ust_author_var.get(),
                     "lyric": self.show_lyric_var.get(),
-                    "curve_show": self.curve_show.get()
+                    "curve_show": self.curve_show.get(),
+                    "record": self.record_var.get()
                 },
                 
                 # 项目信息（来自GUI输入框）
@@ -1114,7 +1128,7 @@ class UstxPlayerSettings:
             }
             
             # 3. 提示用户即将播放
-            messagebox.showinfo("WaitingForUser", "按下确认后将启动播放器，鼠标单击后按ESC键退出全屏")
+            messagebox.showinfo("WaitingForUser", "按下确认后将启动播放器，鼠标单击后按ESC键退出全屏\n若启用了自动化录屏请确保你的电脑上有oCam并设置录屏快捷键为F2，尽量不要与别的软件冲突！")
             
             # 4. 线程安全：启动子线程，GUI操作投递到主线程
             play_ust(ust_info, self.root, self._safe_display_play)
