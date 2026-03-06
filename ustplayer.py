@@ -3,9 +3,16 @@ import tkinter as tk
 import time
 import re
 from datetime import timedelta
+import keyboard
+from time import sleep
 
 class NoteLyricDisplay:
     def __init__(self, root, ust_info):
+        self.record = ust_info["show_config"].get("record", True) #录屏参数
+
+        if self.record == True:
+            keyboard.press_and_release('F2')
+        
         self.root = root
         self.root.title("ustPlayerform")
 
@@ -193,12 +200,21 @@ class NoteLyricDisplay:
                 current_total_tick = play_elapsed * self.tick_per_second
 
                 # 2. 播放完成判断
+                def close_window_and_press_f2(self):
+                    # 检查是否需要录制（self.record为True时按F2）
+                    if self.record == True:
+                        keyboard.press_and_release('F2')
+                    # 关闭主窗口
+                    sleep(0.5)
+                    self.root.destroy()
+
                 if current_total_tick >= self.total_tick:
                     self.update_full_display(self.get_end_text(), "", {})
                     if self.play_timer_id:
                         self.root.after_cancel(self.play_timer_id)
-                    self.root.after(1000, self.root.destroy)
+                    self.root.after(500, lambda: close_window_and_press_f2(self))
                     return
+                
 
                 # 3. 快速匹配当前应播放的音符（基于预计算的tick区间）
                 current_note = None
@@ -468,9 +484,14 @@ class NoteLyricDisplay:
             if self.play_timer_id:
                 self.root.after_cancel(self.play_timer_id)
             self.root.destroy()
+            if self.record == True :
+                keyboard.press_and_release('F2')
         except:
             self.root.quit()
             self.root.destroy()
+            if self.record == True :
+                keyboard.press_and_release('F2')
+
 
 # 对外接口
 def display(ust_info):
