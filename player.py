@@ -1,4 +1,5 @@
 # player.py  ——  PySide6 全屏 UST 播放器
+import os
 import time
 import re
 from datetime import timedelta
@@ -6,13 +7,22 @@ from datetime import timedelta
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QPainterPath, QPen,
-    QShowEvent, QResizeEvent, QPaintEvent, QKeyEvent,
+    QFontDatabase, QShowEvent, QResizeEvent, QPaintEvent, QKeyEvent,
 )
 from PySide6.QtWidgets import QApplication, QWidget
 
 from ust_types import NoteInfo, UstInfo
 from typing import cast
 
+
+# ---- 加载自定义字体 ----
+_font_path = os.path.join(os.path.dirname(__file__), "等线.ttf")
+_font_id = QFontDatabase.addApplicationFont(_font_path)
+if _font_id >= 0:
+    _font_families = QFontDatabase.applicationFontFamilies(_font_id)
+    _CUSTOM_FONT = _font_families[0] if _font_families else "Microsoft YaHei"
+else:
+    _CUSTOM_FONT = "Microsoft YaHei" # pyright: ignore[reportConstantRedefinition]
 
 _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -125,9 +135,9 @@ class NoteLyricDisplay(QWidget):
         self.lrc_text_color = QColor(self.small_font_color)
 
         # ---- 字体（具体大小在 resizeEvent 中调整）----
-        self.note_font = QFont("Microsoft YaHei", 100, QFont.Weight.Bold)
-        self.lyric_font = QFont("Microsoft YaHei", 30, QFont.Weight.Normal)
-        self.ust_lyric_font = QFont("Microsoft YaHei", 140, QFont.Weight.Bold)
+        self.note_font = QFont(_CUSTOM_FONT, 100, QFont.Weight.Bold)
+        self.lyric_font = QFont(_CUSTOM_FONT, 30, QFont.Weight.Normal)
+        self.ust_lyric_font = QFont(_CUSTOM_FONT, 140, QFont.Weight.Bold)
         self.small_font = QFont("Microsoft YaHei", 14)
         self.copyright_font = QFont("Microsoft YaHei", 12)
 
@@ -152,9 +162,9 @@ class NoteLyricDisplay(QWidget):
         self.note_font_size = max(int(h * 2 / 3 * 0.4), 50)
         self.lyric_font_size = max(int(h * 0.03), 10)
         self.ust_lyric_font_size = max(int(h * 2 / 3 * 0.2), 80)
-        self.note_font = QFont("Microsoft YaHei", self.note_font_size, QFont.Weight.Bold)
-        self.lyric_font = QFont("Microsoft YaHei", self.lyric_font_size, QFont.Weight.Normal)
-        self.ust_lyric_font = QFont("Microsoft YaHei", self.ust_lyric_font_size, QFont.Weight.Bold)
+        self.note_font = QFont(_CUSTOM_FONT, self.note_font_size, QFont.Weight.Bold)
+        self.lyric_font = QFont(_CUSTOM_FONT, self.lyric_font_size, QFont.Weight.Normal)
+        self.ust_lyric_font = QFont(_CUSTOM_FONT, self.ust_lyric_font_size, QFont.Weight.Bold)
         self.note_line_offset = self.note_font_size // 4
 
     def showEvent(self, event: QShowEvent) -> None:

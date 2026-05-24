@@ -19,6 +19,7 @@ DATA_FILES = {
     os.path.join(PROJECT_ROOT, "README.md"): "README.md",
     os.path.join(PROJECT_ROOT, "setting.json"): "setting.json",
     os.path.join(PROJECT_ROOT, "icon.png"): "icon.png",
+    os.path.join(PROJECT_ROOT, "等线.ttf"): "等线.ttf",
 }
 
 def build() -> None:
