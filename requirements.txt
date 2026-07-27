@@ -18,7 +18,7 @@ PySide6-Fluent-Widgets[full]>=1.11.2
 #   logger.info / logger.debug / logger.exception
 loguru>=0.7.0
 
-
+requests>=2.32.3
 # ==================== 标准库 (无需安装) ====================
 # os, sys, re, time, subprocess, webbrowser
 # datetime.timedelta, configparser

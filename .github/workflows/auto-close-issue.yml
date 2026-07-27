@@ -1,0 +1,39 @@
+name: Auto close issue
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: 从 commit 消息提取关联 Issue 并关闭
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+        run: |
+          # 匹配 close/closes/closed/fix/fixes/fixed/resolve/resolves/resolved #数字
+          issues=$(echo "$COMMIT_MSG" | grep -oPi '(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#\d+' | grep -oP '#\d+' | sort -u)
+
+          if [ -z "$issues" ]; then
+            echo "未在 commit 消息中找到关联的 Issue，跳过。"
+            exit 0
+          fi
+
+          echo "找到以下关联 Issue："
+          echo "$issues"
+
+          for issue in $issues; do
+            num="${issue#\#}"
+            echo "正在关闭 Issue #$num ..."
+            gh issue close "$num" \
+              --repo "${{ github.repository }}" \
+              --reason completed \
+              --comment "已通过提交 $COMMIT_URL 修复，自动关闭此 Issue。"
+            echo "Issue #$num 已关闭。"
+          done

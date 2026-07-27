@@ -1,0 +1,79 @@
+name: 🐛 Bug 报告
+description: 反馈程序异常、崩溃或行为不符合预期的问题。
+title: "[Bug] 简要描述你遇到的问题"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你花时间提交 Bug 报告！请尽可能提供详细信息，以帮助我们快速定位问题。
+
+  - type: input
+    id: version
+    attributes:
+      label: ustPlayer 版本
+      description: 你使用的 ustPlayer 版本号（可在"其他"页面或更新日志中查看）。
+      placeholder: 例如 v26a31
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统
+      description: 你的 Windows 版本。
+      placeholder: 例如 Windows 11 23H2
+    validations:
+      required: true
+
+  - type: input
+    id: error_code
+    attributes:
+      label: 错误码（如有）
+      description: 弹窗中显示的 ERcode 编号。
+      placeholder: 例如 ERcode001 / ERcode004 / ERcode999
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰描述发生了什么问题。
+      placeholder: |
+        例如：点击"播放"按钮后程序闪退，无任何提示。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 一步步说明如何触发此问题。
+      placeholder: |
+        1. 打开 ustPlayer
+        2. 在"基础"页面选择 UST 文件，编码设为 xxx
+        3. 点击"播放"按钮
+        4. 出现错误弹窗
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 你期望发生什么？
+      placeholder: 例如：正常启动播放器并显示音符。
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: |
+        如有相关日志或截图，请拖拽到此处。
+        日志文件通常位于程序目录下的 `logs/` 文件夹中。
+      placeholder: 拖拽日志文件或截图到此处...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 任何其他有助于排查的信息（如使用的 UST 文件特征、编码方式等）。

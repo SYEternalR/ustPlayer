@@ -15,6 +15,15 @@
 
 </div>
 
+## 下载说明
+
+仓库提供了三种下载方式：**Actions**，**Pre-Release**以及**Release**，**Actions**包含最新的功能，但是这些功能有可能未完工，**Pre-Release**是比**Actions**更加稳定的版本，主要用于尝鲜，日常请使用**Release**的最新版本。
+<div align="center">
+
+[**Actions**下载页面](https://github.com/SYEternalR/ustPlayer/actions) | [**Pre-Release**下载页面](https://github.com/SYEternalR/ustPlayer/releases) | [**Release**下载页面](https://github.com/SYEternalR/ustPlayer/releases/latest)
+
+</div>
+
 > [!WARNING]
 > 
 > 我们将不再提供 .msi 安装包，也不再打算提供 .app 格式程序。

@@ -1,0 +1,150 @@
+name: Build / Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # 构建：常规提交 + PR + 手动触发（pass 开头的消息跳过）
+  # ============================================================
+  build:
+    if: |
+      github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'pass')
+    runs-on: windows-latest
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.name }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 获取短 commit SHA
+        id: sha
+        shell: bash
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: 设置 Python 3.12.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.9"
+          architecture: "x64"
+          cache: "pip"
+          cache-dependency-path: "requirements.txt"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 使用 Nuitka 打包
+        uses: Nuitka/Nuitka-Action@main
+        with:
+          script-name: main.py
+          nuitka-version: main
+          mode: standalone
+          output-file: ustPlayer
+          include-data-files: |
+            ERcode.txt=ERcode.txt
+            Terms.txt=Terms.txt
+            icon.ico=icon.ico
+          windows-icon-from-ico: icon.ico
+          enable-plugins: pyside6
+          windows-console-mode: disable
+
+      - name: 上传构建产物
+        id: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ustPlayer-${{ steps.sha.outputs.short }}-Windows
+          path: build/main.dist/
+          include-hidden-files: true
+
+  # ============================================================
+  # 发版：tag 推送 或 commit 消息以 v 开头时触发
+  # ============================================================
+  release:
+    if: |
+      (startsWith(github.ref, 'refs/tags/') || startsWith(github.event.head_commit.message, 'v')) && !startsWith(github.event.head_commit.message, 'pass')
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: build/main.dist/
+
+      - name: 解析版本号
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${{ github.ref_name }}"
+            full="${{ github.ref_name }}"
+          else
+            msg="${{ github.event.head_commit.message }}"
+            tag=$(echo "$msg" | cut -d' ' -f1)
+            full=$(echo "$msg" | tr ' ' '-')
+          fi
+          echo "tag=${tag}" >> $GITHUB_OUTPUT
+          echo "file=$(echo "${full}" | tr ' ' '-' | sed 's/Beta/beta/g; s/Alpha/alpha/g')" >> $GITHUB_OUTPUT
+          echo "title=${full#v}" >> $GITHUB_OUTPUT
+          case "$full" in
+            *[Bb]eta*|*[Aa]lpha*) echo "prerelease=true" >> $GITHUB_OUTPUT ;;
+            *)                    echo "prerelease=false" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: 从 UPDATELOG.md 提取版本信息
+        id: changelog
+        run: |
+          $tag = '${{ steps.ver.outputs.tag }}'
+          $content = Get-Content UPDATELOG.md -Raw -Encoding UTF8
+          if ($content -match "(?ms)^(## $tag\b[^\n]*)\n(.*?)(?=\r?\n## |\Z)") {
+              $heading = ($matches[1] -replace '^## v?', '').Trim()
+              $section = $matches[2].Trim()
+              "Found changelog section for $tag" | Write-Host
+          } else {
+              $heading = '${{ steps.ver.outputs.title }}'
+              $section = "<!-- 未在 UPDATELOG.md 中找到 $tag 的更新说明 -->"
+              "WARNING: No changelog section found for $tag" | Write-Host
+          }
+          $section | Set-Content changelog_body.md -Encoding UTF8
+          "title=$heading" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag_name=$($heading -replace ' ', '-')" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: 打包产物
+        run: |
+          $name = "ustPlayer-${{ steps.ver.outputs.file }}-Windows-x64.zip"
+          Compress-Archive -Path build/main.dist/* -DestinationPath $name
+          "Artifact: $name" | Write-Host
+
+      - name: 创建 tag（commit 消息触发时）
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: |
+          if ! git rev-parse "${{ steps.changelog.outputs.tag_name }}" >/dev/null 2>&1; then
+            git tag "${{ steps.changelog.outputs.tag_name }}"
+            git push origin "${{ steps.changelog.outputs.tag_name }}"
+          fi
+
+      - name: 创建 Release 并上传产物
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.changelog.outputs.tag_name }}
+          name: ${{ steps.changelog.outputs.title }}
+          body_path: changelog_body.md
+          files: ustPlayer-${{ steps.ver.outputs.file }}-Windows-x64.zip
+          prerelease: ${{ steps.ver.outputs.prerelease == 'true' }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
